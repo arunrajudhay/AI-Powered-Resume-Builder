@@ -1,8 +1,14 @@
 from flask import Flask, render_template, request, redirect, url_for
+from pymongo import MongoClient
 import os
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
+
+# MongoDB connection
+client = MongoClient("mongodb+srv://flaskuser:resumebuilder2025@resume-builder.kcv5vei.mongodb.net/?retryWrites=true&w=majority&appName=Resume-builder")
+db = client["resume_app"]  # Database name
+uploads_collection = db["uploads"]  # Collection name
 
 @app.route('/')
 def home():
@@ -20,17 +26,24 @@ def upload_resume():
 def upload():
     file = request.files.get('resume')
     if file:
-        # Example: read contents (in memory)
-        content = file.read()  # bytes
+        content = file.read()
         filename = file.filename
-        # You can parse `content` here using your resume parser logic
-        print(f"Uploaded: {filename}, size: {len(content)} bytes")
-        return 'Upload processed in memory!'
+        size = len(content)
+
+        # Save to MongoDB
+        uploads_collection.insert_one({
+            "filename": filename,
+            "size": size,
+            "content": content
+        })
+
+        print(f"Uploaded: {filename}, size: {size} bytes")
+        return 'Upload processed and saved to MongoDB!'
     return 'No file uploaded!', 400
 
 @app.route("/manual-resume", methods=["GET"])
 def manual_resume():
-    return render_template("manual-form.html",data={})
+    return render_template("manual-form.html", data={})
 
 @app.route('/education-details')
 def education_details():
@@ -50,6 +63,7 @@ def select_template():
         selected = request.form.get('selected_template')
         return redirect(url_for('preview_pdf', template=selected))
     return render_template('layouts.html')
+
 @app.route('/preview_pdf')
 def preview_pdf():
     template = request.args.get('template')
